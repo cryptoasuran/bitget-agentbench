@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo-wordmark.png" alt="AgentBench" width="420" />
+</p>
+
 # bitget-agentbench
 
 Backtest, score and risk-guard Bitget trading agents on real candle data. Point
@@ -27,6 +31,15 @@ options. AgentBench fills that gap:
 - **Prove** it: every run emits a `scorecard.json`, a `trades.jsonl` ledger and a
   manifest with the dataset hash. Re-run with the same seed and you get the same
   numbers, byte for byte.
+
+## How it fits together
+
+![AgentBench architecture](assets/architecture.png)
+
+Your strategy emits orders. RiskGuard screens them against your policy. The fill
+simulator executes the survivors against the next real candle. The metrics engine
+turns the run into a scorecard and a trade ledger. Real candles, no keys,
+reproducible.
 
 ## Install
 
