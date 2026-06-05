@@ -72,9 +72,13 @@ export function computeMetrics(input: MetricsInput): Metrics {
   }
 
   // Per-bar simple returns for Sharpe / Sortino: (e - prev) / prev.
+  // equity[0] is the pre-trade starting-equity sentinel, not a bar close, so we
+  // start from it as the baseline (prev) but do not emit a return for it. That
+  // avoids a spurious leading 0% return contaminating the series.
   const returns: number[] = [];
-  let prev = startingEquity;
-  for (const e of equity) {
+  let prev = equity[0]!;
+  for (let i = 1; i < equity.length; i++) {
+    const e = equity[i]!;
     if (prev > 0) returns.push((e - prev) / prev);
     prev = e;
   }
@@ -87,11 +91,12 @@ export function computeMetrics(input: MetricsInput): Metrics {
   const { winRatePct, profitFactor, totalTrades, totalFees, grossProfit, grossLoss } =
     tradeStats(fills);
 
-  // Turnover = sum|notional| / avg equity
+  // Turnover = sum|notional| / avg equity. Average over true bar closes
+  // (exclude the seed element at index 0).
   let totalTurnover = 0;
   for (const f of fills) totalTurnover += Math.abs(f.price * f.size);
-  const avgEquity =
-    equity.reduce((a, b) => a + b, 0) / equity.length;
+  const barEquity = equity.length > 1 ? equity.slice(1) : equity;
+  const avgEquity = barEquity.reduce((a, b) => a + b, 0) / barEquity.length;
   const turnover = avgEquity > 0 ? totalTurnover / avgEquity : 0;
 
   // Exposure = fraction of bars where a position was held at the bar close.
@@ -127,13 +132,18 @@ function computeSharpe(returns: number[], rf: number, periods: number): number {
   return (excess / Math.sqrt(variance)) * Math.sqrt(periods);
 }
 
-/** Compute annualised Sortino ratio (downside deviation only). */
-function computeSortino(returns: number[], rf: number, periods: number): number {
+/**
+ * Compute annualised Sortino ratio (downside deviation only).
+ * Returns null when there is no downside (no negative returns): the ratio is
+ * mathematically undefined there, and null serialises cleanly to JSON instead
+ * of Infinity (which JSON.stringify turns into null silently).
+ */
+function computeSortino(returns: number[], rf: number, periods: number): number | null {
   if (returns.length < 2) return 0;
   const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
   const excess = mean - rf / periods;
   const negative = returns.filter((r) => r < 0);
-  if (negative.length === 0) return excess > 0 ? Infinity : 0;
+  if (negative.length === 0) return null; // no downside -> undefined
   const downsideVar =
     negative.reduce((sum, r) => sum + r ** 2, 0) / negative.length;
   if (downsideVar <= 0) return 0;
@@ -166,7 +176,10 @@ function tradeStats(fills: readonly Fill[]) {
 
   const totalTrades = wins + losses;
   const winRatePct = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
+  // null when there are no losing trades (factor undefined). Avoids Infinity,
+  // which JSON.stringify silently turns into null anyway.
+  const profitFactor: number | null =
+    grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? null : 0;
 
   return { winRatePct, profitFactor, totalTrades, totalFees, grossProfit, grossLoss };
 }

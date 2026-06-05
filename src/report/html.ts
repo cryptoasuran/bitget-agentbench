@@ -160,8 +160,9 @@ function fmt(n: number): string {
 function fmtPct(n: number): string {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
-function finite(n: number): string {
-  return Number.isFinite(n) ? n.toFixed(2) : "∞";
+function finite(n: number | null): string {
+  if (n === null) return "n/a";
+  return Number.isFinite(n) ? n.toFixed(2) : "n/a";
 }
 function isoUtc(ts: number): string {
   return new Date(ts).toISOString().replace("T", " ").slice(0, 16);

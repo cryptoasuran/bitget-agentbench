@@ -77,16 +77,17 @@ describe("computeMetrics", () => {
     expect(m.sortino).toBe(0);
   });
 
-  it("only winning trades -> profitFactor = Infinity", () => {
+  it("only winning trades -> profitFactor is null (undefined, not Infinity)", () => {
     const winOnly: Fill[] = [
       { ...fills[0]!, realizedPnl: 500 },
     ];
     const m = computeMetrics({
-      equity: [10500], fills: winOnly, violations: noViolations,
+      equity: [10500, 10600], fills: winOnly, violations: noViolations,
       granularity: "1h", riskFree: 0,
       startingEquity: 10_000, totalBars: 1,
     });
-    expect(m.profitFactor).toBe(Infinity);
+    // null serialises cleanly to JSON; Infinity would become null silently
+    expect(m.profitFactor).toBeNull();
     expect(m.winRatePct).toBe(100);
   });
 
@@ -98,7 +99,24 @@ describe("computeMetrics", () => {
     });
     // Existence check — exact values verified by golden snapshots
     expect(m.sharpe).toBeLessThan(0); // losing run
-    expect(m.sortino).toBeLessThan(0);
-    expect(Number.isFinite(m.sortino)).toBe(true);
+    expect(m.sortino).not.toBeNull();
+    expect(m.sortino!).toBeLessThan(0);
+    expect(Number.isFinite(m.sortino!)).toBe(true);
+  });
+
+  it("no scorecard metric serialises to a JSON null hole from Infinity", () => {
+    // A run with downside present and losses present -> both finite numbers
+    const m = computeMetrics({
+      equity, fills, violations: noViolations,
+      granularity: "1h", riskFree: 0,
+      startingEquity: 10_000, totalBars: 3,
+    });
+    const json = JSON.stringify(m);
+    // Infinity would have stringified to null; assert no accidental nulls beyond
+    // the two intentionally-nullable fields when they are defined here.
+    const parsed = JSON.parse(json);
+    expect(Number.isFinite(parsed.sharpe)).toBe(true);
+    expect(Number.isFinite(parsed.maxDrawdownPct)).toBe(true);
+    expect(Number.isFinite(parsed.turnover)).toBe(true);
   });
 });

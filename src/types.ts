@@ -219,9 +219,11 @@ export const MetricsSchema = z.object({
   totalReturnPct: z.number(),
   maxDrawdownPct: z.number(),
   sharpe: z.number(),
-  sortino: z.number(),
+  /** null when there is no downside (no negative returns): ratio undefined. */
+  sortino: z.number().nullable(),
   winRatePct: z.number(),
-  profitFactor: z.number(),
+  /** null when there are no losing trades: factor undefined. */
+  profitFactor: z.number().nullable(),
   totalTrades: z.number().int(),
   totalFees: z.number(),
   turnover: z.number(),

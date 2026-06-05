@@ -112,15 +112,18 @@ function checkOrder(
     }
   }
 
-  // Max leverage = gross notional of all positions / equity
+  // Max gross exposure = gross position notional / equity. For long-only spot
+  // this is bounded by 1x in practice (you cannot hold more than your cash buys);
+  // the cap is meaningful as a guard against an agent trying to over-allocate,
+  // and it is the right primitive to extend to real leverage once futures land.
   if (policy.maxLeverage && ctx.equity > 0) {
     const grossNotional = Math.abs(state.size * price) + notional;
-    const leverage = grossNotional / ctx.equity;
-    if (leverage > policy.maxLeverage) {
+    const exposure = grossNotional / ctx.equity;
+    if (exposure > policy.maxLeverage) {
       return {
         time: now,
         rule: "max-leverage",
-        detail: `leverage ${leverage.toFixed(2)} > max ${policy.maxLeverage}`,
+        detail: `gross exposure ${exposure.toFixed(2)}x > max ${policy.maxLeverage}x`,
         action: "reject",
       };
     }

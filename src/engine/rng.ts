@@ -1,8 +1,11 @@
 /**
  * Seeded PRNG (xoshiro128** variant, simplified for single-stream use).
  * Deterministic — same seed always produces the same sequence.
- * Used for any randomness the backtest engine needs (e.g. tie-breaking).
- * No Math.random anywhere in the engine path.
+ *
+ * Note: the core backtest is deterministic because it contains no randomness
+ * (no Math.random, no wall-clock). The recorded `seed` is reserved for strategies
+ * or extensions that need reproducible randomness; pass it to this RNG. It is not
+ * required for the engine's own determinism.
  */
 export class SeededRng {
   private s: Uint32Array;
