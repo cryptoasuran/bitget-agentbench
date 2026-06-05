@@ -1,0 +1,39 @@
+{
+  "agent": "rsi-meanrev",
+  "metrics": {
+    "startingEquity": 10000,
+    "finalEquity": 9899.96345490187,
+    "totalReturnPct": -1.0003654509812987,
+    "maxDrawdownPct": 2.625420025239953,
+    "sharpe": -0.9404576127585067,
+    "sortino": -0.6374839197581504,
+    "winRatePct": 78.57142857142857,
+    "profitFactor": 1.2353102340777302,
+    "totalTrades": 14,
+    "totalFees": 21.65659284813,
+    "turnover": 2.1744426108668384,
+    "exposurePct": 52.04301075268817,
+    "violations": 0
+  },
+  "manifest": {
+    "agentbenchVersion": "0.1.0",
+    "symbol": "BTCUSDT",
+    "granularity": "4h",
+    "source": "fixture",
+    "bars": 930,
+    "firstBarTime": 1767240000000,
+    "lastBarTime": 1780617600000,
+    "datasetSha256": "3476016e55d868ed6c05e442416301be73f6dd8c120b5f9a2d8c41319f3ec6cc",
+    "schemaVersion": 1,
+    "engine": {
+      "startingEquity": 10000,
+      "feeBps": 10,
+      "slippageBps": 1,
+      "seed": 42
+    },
+    "risk": {
+      "maxDrawdownKill": 0.3,
+      "maxPositionSize": 1
+    }
+  }
+}

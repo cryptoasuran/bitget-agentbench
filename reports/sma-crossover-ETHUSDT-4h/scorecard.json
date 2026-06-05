@@ -1,0 +1,39 @@
+{
+  "agent": "sma-crossover",
+  "metrics": {
+    "startingEquity": 10000,
+    "finalEquity": 9987.708577996817,
+    "totalReturnPct": -0.1229142200318347,
+    "maxDrawdownPct": 0.14886134577875104,
+    "sharpe": -3.443447405989788,
+    "sortino": -2.204855351843593,
+    "winRatePct": 15.789473684210526,
+    "profitFactor": 0.22258964047322857,
+    "totalTrades": 19,
+    "totalFees": 0.8722928331900001,
+    "turnover": 0.08728532412102026,
+    "exposurePct": 39.720129171151775,
+    "violations": 0
+  },
+  "manifest": {
+    "agentbenchVersion": "0.1.0",
+    "symbol": "ETHUSDT",
+    "granularity": "4h",
+    "source": "fixture",
+    "bars": 929,
+    "firstBarTime": 1767254400000,
+    "lastBarTime": 1780617600000,
+    "datasetSha256": "476be8fd0db936b4af04768aaa9753a2f4c2bf37d08d89a0c25a90b0e5862e5c",
+    "schemaVersion": 1,
+    "engine": {
+      "startingEquity": 10000,
+      "feeBps": 10,
+      "slippageBps": 1,
+      "seed": 42
+    },
+    "risk": {
+      "maxDrawdownKill": 0.3,
+      "maxPositionSize": 1
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "agent": "rsi-meanrev",
+  "metrics": {
+    "startingEquity": 10000,
+    "finalEquity": 9999.847597910828,
+    "totalReturnPct": -0.0015240208917202836,
+    "maxDrawdownPct": 0.0048738842394290965,
+    "sharpe": -0.8164632184120737,
+    "sortino": -0.5306123976066652,
+    "winRatePct": 73.33333333333333,
+    "profitFactor": 1.067774407786598,
+    "totalTrades": 15,
+    "totalFees": 0.028729179170000004,
+    "turnover": 0.0028729433242571036,
+    "exposurePct": 51.022604951560815,
+    "violations": 0
+  },
+  "manifest": {
+    "agentbenchVersion": "0.1.0",
+    "symbol": "SOLUSDT",
+    "granularity": "4h",
+    "source": "fixture",
+    "bars": 929,
+    "firstBarTime": 1767254400000,
+    "lastBarTime": 1780617600000,
+    "datasetSha256": "604eef551bf3a613bd734bfe6ad0743c694aed1b42985f83b329183034840448",
+    "schemaVersion": 1,
+    "engine": {
+      "startingEquity": 10000,
+      "feeBps": 10,
+      "slippageBps": 1,
+      "seed": 42
+    },
+    "risk": {
+      "maxDrawdownKill": 0.3,
+      "maxPositionSize": 1
+    }
+  }
+}
