@@ -14,7 +14,8 @@
     }
   },
   "bin": {
-    "agentbench": "dist/cli.js"
+    "agentbench": "dist/cli.js",
+    "agentbench-mcp": "dist/mcp.js"
   },
   "files": [
     "dist",
@@ -43,6 +44,7 @@
     "risk"
   ],
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "bitget-core": "^1.1.0",
     "zod": "^3.25.76"
   },

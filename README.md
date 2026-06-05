@@ -114,6 +114,39 @@ const { scorecard, fills } = await runBacktest({
 console.log(scorecard.metrics);
 ```
 
+## MCP: let an agent backtest itself
+
+AgentBench ships an MCP server, so an agent running in Claude, Cursor or any
+MCP client can score a strategy without leaving its tool loop. This is the
+"agent grades its own homework" path, and it slots right next to the official
+Bitget Agent Hub MCP server.
+
+Add it to Claude Code:
+
+```bash
+claude mcp add -s user agentbench -- npx -y -p bitget-agentbench agentbench-mcp
+```
+
+Or wire it manually (Cursor, Claude Desktop, etc.):
+
+```json
+{
+  "mcpServers": {
+    "agentbench": { "command": "npx", "args": ["-y", "-p", "bitget-agentbench", "agentbench-mcp"] }
+  }
+}
+```
+
+It exposes one tool, `agentbench_run`, which backtests a built-in strategy on a
+fixture and returns the scorecard. No keys, deterministic, read-only:
+
+```
+agentbench_run({ strategy: "rsi-meanrev", symbol: "BTCUSDT", granularity: "4h", seed: 42 })
+-> { agent, metrics: { totalReturnPct, maxDrawdownPct, sharpe, winRatePct, ... }, manifest }
+```
+
+The binary is `agentbench-mcp` and speaks MCP over stdio.
+
 ## RiskGuard
 
 Every order passes through a policy gate before it can fill. Set only the limits
@@ -159,17 +192,17 @@ result and confirm the numbers rather than trusting a screenshot.
 
 ## Security
 
-This package depends only on `bitget-core`. It has no `postinstall` script and
-ships a `guard:deps` check that fails the build if any unexpected package enters
-the dependency tree. Nothing here touches your shell, your global config or your
-credentials.
+This package depends only on `bitget-core`, the official MCP SDK and `zod`. It
+has no `postinstall` script and ships a `guard:deps` check that fails the build
+if any unexpected package enters the dependency tree. Nothing here touches your
+shell, your global config or your credentials.
 
 ## Development
 
 ```bash
 npm install
 npm run build
-npm test          # 28 tests: simulator, metrics, fixtures, types
+npm test          # 33 tests: simulator, metrics, fixtures, types, mcp
 npm run typecheck
 npm run guard:deps
 ```
@@ -177,7 +210,7 @@ npm run guard:deps
 ## Verification
 
 Every financial formula is reviewed and the whole suite is verified locally
-before release: 29 passing tests, a clean type-check, and end-to-end runs that
+before release: 33 passing tests, a clean type-check, and end-to-end runs that
 reproduce byte-identical scorecards from a fixed seed. The fill model, fee rate
 and metric formulas are documented above so they can be checked rather than
 trusted.

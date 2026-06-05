@@ -51,3 +51,7 @@ export { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
 // Report
 export { emitReport, hashDataset } from "./report/emit.js";
 export { renderHtml } from "./report/html.js";
+
+// Built-in example strategies (reusable)
+export { default as smaCrossover } from "./strategies/sma-crossover.js";
+export { default as rsiMeanrev } from "./strategies/rsi-meanrev.js";
