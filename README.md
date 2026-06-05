@@ -63,8 +63,14 @@ Violations:  0
 Report: ./report/
 ```
 
-and a `report/` folder with `scorecard.json`, `trades.jsonl`, `equity.csv` and
-`manifest.json`.
+and a `report/` folder with `scorecard.json`, `trades.jsonl`, `equity.csv`,
+`manifest.json` and a self-contained `scorecard.html`:
+
+![AgentBench scorecard](assets/scorecard.png)
+
+Every number above is computed from real Bitget candles and reproduces from the
+seed. Open `scorecard.html` in a browser to get the equity curve and the full
+trade ledger.
 
 ## Integrate your own agent in 5 lines
 

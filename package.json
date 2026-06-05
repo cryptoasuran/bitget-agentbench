@@ -20,6 +20,8 @@
   "files": [
     "dist",
     "fixtures",
+    "examples",
+    "assets",
     "README.md"
   ],
   "scripts": {
