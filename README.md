@@ -53,10 +53,13 @@ The package ships with real Bitget candle fixtures, so you can run a full backte
 the moment it is installed.
 
 ```bash
-npx agentbench run \
-  --agent ./node_modules/bitget-agentbench/examples/sma-crossover.ts \
+npx agentbench run --strategy sma-crossover \
   --symbol BTCUSDT --tf 4h --seed 42 --out ./report
 ```
+
+Built-in strategies are `sma-crossover` and `rsi-meanrev`. To score your own
+agent, point `--agent` at a file in your project that exports a default
+`{ onBar(bar, ctx) }` (see the library example below).
 
 You get:
 
@@ -64,13 +67,16 @@ You get:
 Agent:       sma-crossover
 Symbol:      BTCUSDT 4h
 Bars:        930
-Equity:      10000 -> 9786.39
+Version:     0.1.2
+Equity:      10000 → 9786.39
 Return:      -2.14%
 Max DD:      2.70%
-Sharpe:      -2.45
+Sharpe:      -2.46
+Sortino:     -1.68
 Win Rate:    27.8%
+Profit Fact: 0.32
 Trades:      18
-Fees:        25.42
+Fees:        26.7898
 Violations:  0
 
 Report: ./report/
@@ -114,7 +120,7 @@ drops in without a rewrite.
 ## Use it as a library
 
 ```ts
-import { runBacktest, loadFixture } from "bitget-agentbench";
+import { runBacktest, loadFixture, VERSION } from "bitget-agentbench";
 
 const bars = loadFixture("BTCUSDT", "4h");
 const { scorecard, fills } = await runBacktest({
@@ -123,7 +129,7 @@ const { scorecard, fills } = await runBacktest({
   config: { startingEquity: 10_000, feeBps: 10, slippageBps: 1, seed: 42 },
   risk: { maxDrawdownKill: 0.3, maxPositionSize: 1 },
   manifest: {
-    agentbenchVersion: "0.1.0", symbol: "BTCUSDT", granularity: "4h",
+    agentbenchVersion: VERSION, symbol: "BTCUSDT", granularity: "4h",
     source: "fixture", bars: bars.length,
     firstBarTime: bars[0].time, lastBarTime: bars[bars.length - 1].time,
     datasetSha256: "fixture",

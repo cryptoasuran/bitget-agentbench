@@ -26,18 +26,11 @@ import {
 import { runBacktest } from "./engine/backtest.js";
 import { hashDataset } from "./report/emit.js";
 import { loadFixture } from "./sources/fixture-source.js";
-import { GRANULARITIES, type Granularity, type StrategyAgent } from "./types.js";
-import smaCrossover from "./strategies/sma-crossover.js";
-import rsiMeanrev from "./strategies/rsi-meanrev.js";
+import { GRANULARITIES, type Granularity } from "./types.js";
+import { STRATEGIES } from "./strategies/registry.js";
+import { VERSION } from "./version.js";
 
 const SERVER_NAME = "agentbench-mcp";
-const SERVER_VERSION = "0.1.0";
-
-/** Built-in strategies the MCP tool can run by name. */
-const STRATEGIES: Record<string, StrategyAgent> = {
-  "sma-crossover": smaCrossover,
-  "rsi-meanrev": rsiMeanrev,
-};
 
 const RUN_TOOL: Tool = {
   name: "agentbench_run",
@@ -91,7 +84,7 @@ function fail(message: string): CallToolResult {
 
 export function createServer(): Server {
   const server = new Server(
-    { name: SERVER_NAME, version: SERVER_VERSION },
+    { name: SERVER_NAME, version: VERSION },
     { capabilities: { tools: {} } },
   );
 
@@ -128,7 +121,7 @@ export function createServer(): Server {
         config: { startingEquity: 10_000, feeBps: 10, slippageBps: 1, seed },
         risk: { maxDrawdownKill: 0.3, maxPositionSize: 1 },
         manifest: {
-          agentbenchVersion: SERVER_VERSION,
+          agentbenchVersion: VERSION,
           symbol,
           granularity,
           source: "fixture",

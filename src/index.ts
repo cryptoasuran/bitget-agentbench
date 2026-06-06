@@ -55,3 +55,7 @@ export { renderHtml } from "./report/html.js";
 // Built-in example strategies (reusable)
 export { default as smaCrossover } from "./strategies/sma-crossover.js";
 export { default as rsiMeanrev } from "./strategies/rsi-meanrev.js";
+export { STRATEGIES, listStrategies } from "./strategies/registry.js";
+
+// Package version (single source of truth, stamped into every scorecard)
+export { VERSION } from "./version.js";
