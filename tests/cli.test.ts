@@ -2,10 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 import {
   cmdRun,
   cmdReport,
   cmdCompare,
+  cmdVerify,
   resolveAgent,
   helpText,
 } from "../src/cli.js";
@@ -112,11 +114,59 @@ describe("agentbench compare", () => {
   });
 });
 
+describe("agentbench verify", () => {
+  it("verifies a freshly emitted report and reports VERIFIED", async () => {
+    const out = tmpOut();
+    await cmdRun(runOpts({ strategyName: "rsi-meanrev", outDir: out }));
+    const prevExit = process.exitCode;
+    const cap = captureStdout();
+    await cmdVerify({ cmd: "verify", args: [out] });
+    cap.restore();
+    const text = cap.writes.join("");
+    expect(text).toContain("[PASS] integrity");
+    expect(text).toContain("[PASS] ledger");
+    expect(text).toContain("[PASS] replay");
+    expect(text).toContain("VERIFIED");
+    expect(process.exitCode).not.toBe(1);
+    process.exitCode = prevExit;
+  });
+
+  it("fails with exit code 1 when the scorecard is tampered", async () => {
+    const out = tmpOut();
+    await cmdRun(runOpts({ strategyName: "rsi-meanrev", outDir: out }));
+    const scPath = join(out, "scorecard.json");
+    const sc = JSON.parse(readFileSync(scPath, "utf8"));
+    sc.metrics.totalReturnPct = 1234;
+    writeFileSync(scPath, JSON.stringify(sc, null, 2));
+
+    const prevExit = process.exitCode;
+    const cap = captureStdout();
+    await cmdVerify({ cmd: "verify", args: [out] });
+    cap.restore();
+    const text = cap.writes.join("");
+    expect(text).toContain("[FAIL] integrity");
+    expect(text).toContain("FAILED");
+    expect(process.exitCode).toBe(1);
+    process.exitCode = prevExit;
+  });
+
+  it("errors when no target is given", async () => {
+    const prevExit = process.exitCode;
+    await cmdVerify({ cmd: "verify", args: [] });
+    expect(process.exitCode).toBe(1);
+    process.exitCode = prevExit;
+  });
+});
+
 describe("help", () => {
   it("lists the built-in strategies and the real version", () => {
     const text = helpText();
     expect(text).toContain("sma-crossover");
     expect(text).toContain("rsi-meanrev");
     expect(text).toContain(VERSION);
+  });
+
+  it("documents the verify command", () => {
+    expect(helpText()).toContain("agentbench verify");
   });
 });

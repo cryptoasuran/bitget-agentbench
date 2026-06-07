@@ -16,7 +16,7 @@
     "violations": 0
   },
   "manifest": {
-    "agentbenchVersion": "0.1.2",
+    "agentbenchVersion": "0.2.0",
     "symbol": "BTCUSDT",
     "granularity": "4h",
     "source": "fixture",
@@ -35,5 +35,6 @@
       "maxDrawdownKill": 0.3,
       "maxPositionSize": 1
     }
-  }
+  },
+  "scorecardSha256": "5a82aabe9bc3f3a85dc0556302c3eb8ea6a844ef8ce021f136318439a90e40ad"
 }

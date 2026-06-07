@@ -1,0 +1,21 @@
+name: "verified-by-agentbench"
+description: >-
+  Fail the build unless an AgentBench scorecard reproduces. Runs the four verify
+  checks (integrity, dataset, ledger, replay) and exits non-zero if any fails.
+branding:
+  icon: "check-circle"
+  color: "green"
+inputs:
+  report:
+    description: "Path to the report directory or scorecard.json to verify."
+    required: true
+  version:
+    description: "bitget-agentbench version to run (npm dist-tag or exact version)."
+    required: false
+    default: "latest"
+runs:
+  using: "composite"
+  steps:
+    - name: Verify scorecard reproduces
+      shell: bash
+      run: npx -y -p "bitget-agentbench@${{ inputs.version }}" agentbench verify "${{ inputs.report }}"

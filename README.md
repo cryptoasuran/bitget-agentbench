@@ -2,44 +2,45 @@
   <img src="assets/logo-wordmark.png" alt="AgentBench" width="420" />
 </p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/bitget-agentbench"><img src="https://img.shields.io/npm/v/bitget-agentbench" alt="npm version" /></a>
+  <a href="https://github.com/zkasuran/bitget-agentbench/actions/workflows/ci.yml"><img src="https://github.com/zkasuran/bitget-agentbench/actions/workflows/ci.yml/badge.svg" alt="ci" /></a>
+  <img src="https://img.shields.io/badge/verified%20by-agentbench-2ea44f" alt="verified by agentbench" />
+</p>
+
 # bitget-agentbench
 
-Backtest, score and risk-guard Bitget trading agents on real candle data. Point
-it at any strategy and it gives you back a reproducible scorecard and a full trade
-ledger, with zero API keys and zero real money.
+Backtest, score and **verify** Bitget trading agents on real candle data. Point it
+at any strategy and it gives you back a scorecard a stranger can re-run and check,
+with zero API keys and zero real money.
+
+A scorecard you cannot check is a screenshot. AgentBench emits a scorecard anyone
+can re-derive: `agentbench verify` recomputes every number from the trade ledger
+and re-runs the strategy from the manifest, so a result is something you confirm,
+not something you trust.
 
 Built for the [Bitget Agent Hub](https://github.com/BitgetLimited/agent_hub)
 ecosystem. If you are building a trading agent, this is the harness that proves it
-works before it touches a live account.
+works, and proves it to someone else, before it touches a live account.
 
 ## Why this exists
 
 Agent Hub lets an agent read the market and place trades. It does not tell you
-whether the agent is any good. There is no replay, no fill simulation, no
-PnL/drawdown/Sharpe accounting, and no standard artifact you can hand someone to
-say "here is what my agent actually did".
+whether the agent is any good, and it gives you no artifact you can hand someone
+to say "here is what my agent did, check it yourself". So every team rolls its
+own evidence, badly, or trades live to get it. Both are bad options.
 
-So every team rolls its own, badly, or trades live to get evidence. Both are bad
-options. AgentBench fills that gap:
+AgentBench fills that gap and closes it with verification:
 
-- **Backtest** any strategy against real Bitget candles, bar by bar, with no
-  lookahead.
+- **Backtest** any strategy against real Bitget candles, bar by bar, no lookahead.
 - **Risk-guard** it with hard limits (max position, max leverage, drawdown
   kill-switch) so a runaway agent stops instead of blowing up.
 - **Score** it: return, max drawdown, Sharpe, Sortino, win rate, profit factor,
   exposure, fees, turnover.
-- **Prove** it: every run emits a `scorecard.json`, a `trades.jsonl` ledger and a
-  manifest with the dataset hash. Re-run with the same seed and you get the same
-  numbers, byte for byte.
-
-## How it fits together
-
-![AgentBench architecture](assets/architecture.png)
-
-Your strategy emits orders. RiskGuard screens them against your policy. The fill
-simulator executes the survivors against the next real candle. The metrics engine
-turns the run into a scorecard and a trade ledger. Real candles, no keys,
-reproducible.
+- **Verify** it: every run emits a `scorecard.json` with a content hash, a
+  `trades.jsonl` ledger and a manifest with the dataset hash. `agentbench verify`
+  re-derives the whole claim and prints PASS or FAIL. Re-running a doctored
+  scorecard fails, even if the forger re-stamps the hash.
 
 ## Install
 
@@ -53,43 +54,55 @@ The package ships with real Bitget candle fixtures, so you can run a full backte
 the moment it is installed.
 
 ```bash
-npx agentbench run --strategy sma-crossover \
-  --symbol BTCUSDT --tf 4h --seed 42 --out ./report
+npx agentbench run --strategy sma-crossover --symbol BTCUSDT --tf 4h --seed 42 --out ./report
+npx agentbench verify ./report
 ```
 
 Built-in strategies are `sma-crossover` and `rsi-meanrev`. To score your own
-agent, point `--agent` at a file in your project that exports a default
-`{ onBar(bar, ctx) }` (see the library example below).
+agent, point `--agent` at a file that exports a default `{ onBar(bar, ctx) }`
+(see below).
 
-You get:
-
-```
-Agent:       sma-crossover
-Symbol:      BTCUSDT 4h
-Bars:        930
-Version:     0.1.2
-Equity:      10000 → 9786.39
-Return:      -2.14%
-Max DD:      2.70%
-Sharpe:      -2.46
-Sortino:     -1.68
-Win Rate:    27.8%
-Profit Fact: 0.32
-Trades:      18
-Fees:        26.7898
-Violations:  0
-
-Report: ./report/
-```
-
-and a `report/` folder with `scorecard.json`, `trades.jsonl`, `equity.csv`,
-`manifest.json` and a self-contained `scorecard.html`:
+The run prints a summary and writes a `report/` folder with `scorecard.json`,
+`trades.jsonl`, `equity.csv`, `manifest.json` and a self-contained `scorecard.html`:
 
 ![AgentBench scorecard](assets/scorecard.png)
 
-Every number above is computed from real Bitget candles and reproduces from the
-seed. Open `scorecard.html` in a browser to get the equity curve and the full
-trade ledger.
+Every number is computed from real Bitget candles and reproduces from the seed.
+
+## Verify: do not trust the scorecard, check it
+
+This is the part that matters. `agentbench verify <report-dir | scorecard.json>`
+runs four independent checks and exits non-zero if any fails:
+
+```
+$ npx agentbench verify ./report
+
+Verifying ./report/scorecard.json
+Agent:    rsi-meanrev
+
+  [PASS] integrity content hash matches (5a82aabe9bc3f3a8…)
+  [PASS] dataset   930 candles re-hash to the claimed dataset SHA256 (3476016e55d868ed…)
+  [PASS] ledger    all 12 headline metrics recompute from 29 fills + the equity curve
+  [PASS] replay    re-running rsi-meanrev from the manifest reproduces every metric
+
+VERIFIED — every check the data allows passed
+```
+
+- **integrity** recomputes the scorecard content hash and asserts it matches.
+  Catches any edit to `scorecard.json`.
+- **dataset** reloads the candles named in the manifest, recomputes their SHA256
+  and asserts it matches. Catches swapped or doctored candles.
+- **ledger** recomputes every headline metric straight from `equity.csv` and
+  `trades.jsonl`, reconstructing position and exposure from the fills themselves,
+  and asserts it matches the claim. Catches numbers that do not follow from the
+  trades.
+- **replay** re-runs a built-in agent from the manifest's own config and seed and
+  asserts the metrics reproduce. The strongest check. It skips, with a note, for
+  an external agent it cannot run.
+
+The content hash alone only proves a file was not edited. A forger could edit a
+number and re-stamp the hash. They cannot beat **ledger** and **replay**, which
+recompute the numbers from scratch. That layering is the point.
 
 ## Integrate your own agent in 5 lines
 
@@ -113,14 +126,38 @@ export default agent;
 
 Run it: `npx agentbench run --agent ./buy-the-dip.ts --symbol BTCUSDT --tf 4h`.
 
-The order shape mirrors Bitget's `spot_place_order` fields (symbol, side,
-orderType, price, size), so an agent that already calls Agent Hub trade tools
-drops in without a rewrite.
+## Already built an Agent Hub agent? Drop it in
+
+Agent Hub agents place trades by calling `spot_place_order` with
+`{ symbol, side, orderType, price, size }`. That is exactly AgentBench's order
+shape, so an agent you already wrote does not need a rewrite. Wrap its per-bar
+decision with `fromAgentHub`:
+
+```ts
+import { fromAgentHub } from "bitget-agentbench";
+import type { AgentHubOrder, Bar, BarContext } from "bitget-agentbench";
+
+function decide(bar: Bar, ctx: BarContext): AgentHubOrder[] {
+  // the same spot_place_order calls your Agent Hub agent already makes
+  if (ctx.position.size === 0 && bar.close > someSignal)
+    return [{ symbol: "BTCUSDT", side: "buy", orderType: "market", size: 0.01 }];
+  return [];
+}
+
+export default fromAgentHub("my-hub-agent", decide);
+```
+
+A complete, runnable version is in `examples/agent-hub-adapter.ts`:
+
+```bash
+npx agentbench run --agent examples/agent-hub-adapter.ts --symbol BTCUSDT --tf 4h --seed 42 --out ./report
+npx agentbench verify ./report
+```
 
 ## Use it as a library
 
 ```ts
-import { runBacktest, loadFixture, VERSION } from "bitget-agentbench";
+import { runBacktest, loadFixture, verifyReport, VERSION } from "bitget-agentbench";
 
 const bars = loadFixture("BTCUSDT", "4h");
 const { scorecard, fills } = await runBacktest({
@@ -137,14 +174,14 @@ const { scorecard, fills } = await runBacktest({
 });
 
 console.log(scorecard.metrics);
+const result = await verifyReport("./report"); // { pass, checks: [...] }
 ```
 
-## MCP: let an agent backtest itself
+## MCP: let an agent backtest and grade itself
 
-AgentBench ships an MCP server, so an agent running in Claude, Cursor or any
-MCP client can score a strategy without leaving its tool loop. This is the
-"agent grades its own homework" path, and it slots right next to the official
-Bitget Agent Hub MCP server.
+AgentBench ships an MCP server, so an agent running in Claude, Cursor or any MCP
+client can score and check a strategy without leaving its tool loop. It slots
+right next to the official Bitget Agent Hub MCP server.
 
 Add it to Claude Code:
 
@@ -162,15 +199,29 @@ Or wire it manually (Cursor, Claude Desktop, etc.):
 }
 ```
 
-It exposes one tool, `agentbench_run`, which backtests a built-in strategy on a
-fixture and returns the scorecard. No keys, deterministic, read-only:
+It exposes two tools, deterministic and credential-free:
 
-```
-agentbench_run({ strategy: "rsi-meanrev", symbol: "BTCUSDT", granularity: "4h", seed: 42 })
--> { agent, metrics: { totalReturnPct, maxDrawdownPct, sharpe, winRatePct, ... }, manifest }
+- `agentbench_run({ strategy, symbol, granularity, seed, outDir? })` backtests a
+  built-in strategy and returns the scorecard. Pass `outDir` to persist the full
+  report so the run leaves verifiable artifacts.
+- `agentbench_verify({ target })` runs the four checks above against a report
+  directory or scorecard. This is the "agents grading agents" path: one agent
+  produces a claim, another checks it.
+
+## Verify in CI
+
+A scorecard in a repo should fail the build if its numbers stop reproducing. Drop
+the `verified-by-agentbench` action into a workflow:
+
+```yaml
+- uses: zkasuran/bitget-agentbench@v0.2.0
+  with:
+    report: ./report   # a report dir or scorecard.json committed in your repo
 ```
 
-The binary is `agentbench-mcp` and speaks MCP over stdio.
+It runs `agentbench verify` and the job goes red if integrity, dataset, ledger or
+replay fail. This repo dogfoods it: every report under `reports/` is verified on
+every push, so the badge above means the committed numbers still reproduce.
 
 ## RiskGuard
 
@@ -205,40 +256,42 @@ Conservative and no-lookahead, so a backtest does not flatter the strategy:
 - Fees use Bitget's standard spot rate of 0.1% (verified against Bitget Academy,
   June 2026). Override `feeBps` for your own tier.
 
-This is a long-only spot engine. Short positions and futures funding are on the
-roadmap, not in this release. A sell larger than your position is clamped to what
-you hold, never silently turned into a short.
+This is a long-only spot engine. Short positions and futures funding are out of
+scope for this release, named on purpose rather than half-built. A sell larger
+than your position is clamped to what you hold, never silently turned into a short.
 
 ## Reproducibility
 
 The manifest records the dataset hash, symbol, timeframe, engine config and seed.
-Same inputs in, same scorecard out. That is the verification: anyone can re-run a
-result and confirm the numbers rather than trusting a screenshot.
+Same inputs in, same scorecard out, byte for byte. The scorecard also carries a
+content hash over its own `{agent, metrics, manifest}`. This is a content hash,
+not a cryptographic signature: it proves the file was not altered after emission,
+and `agentbench verify` does the rest by recomputing the numbers independently.
 
 ## Security
 
-This package depends only on `bitget-core`, the official MCP SDK and `zod`. It
-has no `postinstall` script and ships a `guard:deps` check that fails the build
-if any unexpected package enters the dependency tree. Nothing here touches your
-shell, your global config or your credentials.
+This package depends only on `bitget-core`, the official MCP SDK and `zod`. It has
+no `postinstall` script and ships a `guard:deps` check that fails the build if any
+unexpected package enters the dependency tree. Nothing here touches your shell,
+your global config or your credentials.
 
 ## Development
 
 ```bash
 npm install
 npm run build
-npm test          # 33 tests: simulator, metrics, fixtures, types, mcp
+npm test          # 65 tests: simulator, metrics, fixtures, hash, verify, adapter, cli, mcp
 npm run typecheck
 npm run guard:deps
 ```
 
-## Verification
+## Verification done
 
-Every financial formula is reviewed and the whole suite is verified locally
-before release: 33 passing tests, a clean type-check, and end-to-end runs that
-reproduce byte-identical scorecards from a fixed seed. The fill model, fee rate
-and metric formulas are documented above so they can be checked rather than
-trusted.
+Every financial formula is reviewed and the whole suite is verified locally before
+release: 65 passing tests, a clean type-check, end-to-end runs that reproduce
+byte-identical scorecards from a fixed seed, and `agentbench verify` passing on
+every committed report. The fill model, fee rate and metric formulas are
+documented above so they can be checked rather than trusted.
 
 ## License
 
