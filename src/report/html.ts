@@ -30,7 +30,7 @@ export function renderHtml(
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AgentBench scorecard — ${esc(scorecard.agent)}</title>
+<title>AgentBench scorecard: ${esc(scorecard.agent)}</title>
 <style>
   :root { color-scheme: dark; }
   body { margin: 0; background: #0b0e14; color: #d7dce5;
@@ -119,7 +119,7 @@ function cell(k: string, v: string): string {
 
 function tradeRow(f: Fill): string {
   const pnl = f.realizedPnl;
-  const pnlCell = pnl === 0 ? "—" : `<span class="${pnl > 0 ? "pos" : "neg"}">${fmt(pnl)}</span>`;
+  const pnlCell = pnl === 0 ? "·" : `<span class="${pnl > 0 ? "pos" : "neg"}">${fmt(pnl)}</span>`;
   return `<tr>
     <td>${esc(isoUtc(f.time))}</td>
     <td class="${f.side}">${f.side}</td>

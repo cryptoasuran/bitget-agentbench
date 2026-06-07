@@ -1,5 +1,5 @@
 {
-  "agentbenchVersion": "0.2.0",
+  "agentbenchVersion": "0.3.1",
   "symbol": "BTCUSDT",
   "granularity": "4h",
   "source": "fixture",

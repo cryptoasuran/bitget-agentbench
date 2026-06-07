@@ -21,14 +21,14 @@ not something you trust.
 
 Built for the [Bitget Agent Hub](https://github.com/BitgetLimited/agent_hub)
 ecosystem. If you are building a trading agent, this is the harness that proves it
-works, and proves it to someone else, before it touches a live account.
+works and proves it to someone else, before it touches a live account.
 
 ## Why this exists
 
 Agent Hub lets an agent read the market and place trades. It does not tell you
-whether the agent is any good, and it gives you no artifact you can hand someone
+whether the agent is any good and it gives you no artifact you can hand someone
 to say "here is what my agent did, check it yourself". So every team rolls its
-own evidence, badly, or trades live to get it. Both are bad options.
+own evidence, badly or trades live to get it. Both are bad options.
 
 AgentBench fills that gap and closes it with verification:
 
@@ -85,7 +85,7 @@ Agent:    rsi-meanrev
   [PASS] ledger    all 12 headline metrics recompute from 29 fills + the equity curve
   [PASS] replay    re-running rsi-meanrev from the manifest reproduces every metric
 
-VERIFIED — every check the data allows passed
+VERIFIED. The numbers were recomputed from the ledger and they match
 ```
 
 - **integrity** recomputes the scorecard content hash and asserts it matches.
@@ -106,7 +106,7 @@ recompute the numbers from scratch. That layering is the point.
 
 ## Integrate your own agent in 5 lines
 
-A strategy is one method. Return the orders to place on each bar, or an empty
+A strategy is one method. Return the orders to place on each bar or an empty
 array to do nothing.
 
 ```ts
@@ -277,7 +277,7 @@ This is a long-only spot engine. Short positions and futures funding are out of
 scope for this release, named on purpose rather than half-built. A sell larger
 than your position is clamped to what you hold, never silently turned into a short.
 
-Candles come from a committed fixture by default, or live from Bitget's public
+Candles come from a committed fixture by default or live from Bitget's public
 keyless endpoint with `--source live` (see Live candles above).
 
 ## Reproducibility
@@ -309,7 +309,7 @@ npm run guard:deps
 
 Every financial formula is reviewed and the whole suite is verified locally before
 release: 81 passing tests, a clean type-check, end-to-end runs that reproduce
-byte-identical scorecards from a fixed seed, and `agentbench verify` passing on
+byte-identical scorecards from a fixed seed and `agentbench verify` passing on
 every committed report and on a live-fetched run. The fill model, fee rate and
 metric formulas are documented above so they can be checked rather than trusted.
 

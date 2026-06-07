@@ -67,7 +67,7 @@ function parseArgs(argv: string[]): CliArgs {
 function helpText(): string {
   return (
     [
-      "agentbench — backtest and score Bitget trading agents",
+      "agentbench: backtest and score Bitget trading agents",
       "",
       "Usage:",
       "  agentbench run (--strategy <name> | --agent <file>) --symbol <SYM>",
@@ -389,14 +389,14 @@ async function cmdVerify(opts: CliArgs): Promise<void> {
 
   const anyFail = result.checks.some((c) => c.status === "fail");
   if (result.pass) {
-    process.stdout.write("\nVERIFIED — the numbers were independently recomputed and match\n");
+    process.stdout.write("\nVERIFIED. The numbers were recomputed from the ledger and they match\n");
   } else if (anyFail) {
-    process.stdout.write("\nFAILED — see the checks above\n");
+    process.stdout.write("\nFAILED. See the checks above\n");
   } else {
     // No check failed, but no substantive recompute (ledger or replay) ran, so
     // the claim could not actually be checked. Not a pass.
     process.stdout.write(
-      "\nUNVERIFIABLE — nothing failed, but no ledger or replay check could run, " +
+      "\nUNVERIFIABLE. Nothing failed but no ledger or replay check ran, " +
         "so the numbers were never independently recomputed. Point verify at a full " +
         "report directory of a built-in or fixture-backed run.\n",
     );

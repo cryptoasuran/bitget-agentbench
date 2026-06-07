@@ -94,7 +94,7 @@ const VERIFY_TOOL: Tool = {
   description:
     "Independently verify an AgentBench report: recompute the scorecard content " +
     "hash, re-hash the candle dataset, recompute every headline metric from the " +
-    "trade ledger and equity curve, and replay built-in agents from the manifest. " +
+    "trade ledger and equity curve, then replay built-in agents from the manifest. " +
     "Returns pass/fail/skip per check. Use this to check a trading claim instead " +
     "of trusting it.",
   inputSchema: {
