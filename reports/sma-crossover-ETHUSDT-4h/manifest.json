@@ -1,5 +1,5 @@
 {
-  "agentbenchVersion": "0.3.1",
+  "agentbenchVersion": "0.4.0",
   "symbol": "ETHUSDT",
   "granularity": "4h",
   "source": "fixture",

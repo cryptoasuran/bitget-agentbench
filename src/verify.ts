@@ -22,16 +22,29 @@
  * the numbers from scratch and expose the tamper.
  */
 
-import { readFileSync, statSync, existsSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import { readFileSync, statSync, existsSync, readdirSync } from "node:fs";
+import { resolve, dirname, join, basename } from "node:path";
 import { ScorecardSchema, FillSchema } from "./types.js";
-import type { Scorecard, Fill, Metrics, Violation, Bar } from "./types.js";
+import type { Scorecard, Fill, Metrics, Violation, Bar, StrategyAgent } from "./types.js";
 import { hashDataset } from "./report/emit.js";
 import { computeScorecardSha256 } from "./report/hash.js";
 import { computeMetrics } from "./engine/metrics.js";
 import { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
+import { loadAgentFromFile } from "./agent-loader.js";
 import { runBacktest } from "./engine/backtest.js";
 import { STRATEGIES } from "./strategies/registry.js";
+
+/** Base name a live/external run uses when it snapshots its agent into a report. */
+const AGENT_SNAPSHOT_PREFIX = "agent.snapshot.";
+
+/** Options that let verify replay a non-built-in agent. */
+export interface VerifyOptions {
+  /** Path to the agent file to re-run for the replay check (any strategy). */
+  agentPath?: string;
+  /** Opt in to replaying an `agent.snapshot.*` embedded in the report directory.
+   * Off by default: verify never executes code from a report on its own. */
+  replayEmbedded?: boolean;
+}
 
 export type CheckName = "integrity" | "dataset" | "ledger" | "replay";
 export type CheckStatus = "pass" | "fail" | "skip";
@@ -79,7 +92,10 @@ const ALL_FIELDS = [...LEDGER_FIELDS, "violations"] as const;
 /**
  * Verify a report. `target` may be a report directory or a scorecard.json path.
  */
-export async function verifyReport(target: string): Promise<VerifyResult> {
+export async function verifyReport(
+  target: string,
+  opts: VerifyOptions = {},
+): Promise<VerifyResult> {
   const abs = resolve(target);
   const isDir = existsSync(abs) && statSync(abs).isDirectory();
   const scorecardPath = isDir ? join(abs, "scorecard.json") : abs;
@@ -111,7 +127,7 @@ export async function verifyReport(target: string): Promise<VerifyResult> {
     checkIntegrity(scorecardPath, scorecard),
     checkDataset(dir, scorecard),
     checkLedger(dir, scorecard),
-    await checkReplay(dir, scorecard),
+    await checkReplay(dir, scorecard, opts),
   ];
 
   // A SKIP is never a free pass. Require a substantive recompute (ledger or
@@ -358,15 +374,59 @@ function reconstructPositionHeld(
 // replay
 // ---------------------------------------------------------------------------
 
-async function checkReplay(dir: string, scorecard: Scorecard): Promise<CheckResult> {
-  const agent = STRATEGIES[scorecard.agent];
-  if (!agent) {
-    return {
-      name: "replay",
-      status: "skip",
-      detail: `agent "${scorecard.agent}" is not a built-in strategy; cannot re-run an external agent`,
-    };
+/** Find an embedded agent snapshot in a report directory, if present. */
+function findAgentSnapshot(dir: string): string | null {
+  try {
+    const f = readdirSync(dir).find((n) => n.startsWith(AGENT_SNAPSHOT_PREFIX));
+    return f ? join(dir, f) : null;
+  } catch {
+    return null;
   }
+}
+
+async function checkReplay(
+  dir: string,
+  scorecard: Scorecard,
+  opts: VerifyOptions,
+): Promise<CheckResult> {
+  // Resolve a runnable agent, in order of trust:
+  //  1. a built-in strategy (our own code, always safe to run)
+  //  2. an agent file the user explicitly supplied with --agent
+  //  3. an embedded snapshot, only when the user opted in with --replay-embedded
+  // verify never runs report-embedded code on its own. Loading an agent file
+  // executes it, so each path beyond the built-ins requires an explicit choice.
+  let agent: StrategyAgent | undefined = STRATEGIES[scorecard.agent];
+  let how = "built-in";
+
+  if (!agent && opts.agentPath) {
+    try {
+      agent = await loadAgentFromFile(opts.agentPath);
+      how = `--agent ${opts.agentPath}`;
+    } catch (err) {
+      return { name: "replay", status: "skip", detail: `could not load --agent ${opts.agentPath}: ${String(err)}` };
+    }
+  }
+
+  if (!agent && opts.replayEmbedded) {
+    const snap = findAgentSnapshot(dir);
+    if (!snap) {
+      return { name: "replay", status: "skip", detail: "no embedded agent snapshot found in the report" };
+    }
+    try {
+      agent = await loadAgentFromFile(snap);
+      how = `embedded ${basename(snap)}`;
+    } catch (err) {
+      return { name: "replay", status: "skip", detail: `could not load embedded agent ${basename(snap)}: ${String(err)}` };
+    }
+  }
+
+  if (!agent) {
+    const hint = findAgentSnapshot(dir)
+      ? `external agent "${scorecard.agent}". Pass --replay-embedded to re-run the agent snapshot in this report, or --agent <file>`
+      : `external agent "${scorecard.agent}". Pass --agent <file> to replay it`;
+    return { name: "replay", status: "skip", detail: hint };
+  }
+
   const m = scorecard.manifest;
   let bars;
   try {
@@ -401,7 +461,7 @@ async function checkReplay(dir: string, scorecard: Scorecard): Promise<CheckResu
     return {
       name: "replay",
       status: "pass",
-      detail: `re-running ${scorecard.agent} from the manifest reproduces every metric`,
+      detail: `re-running ${scorecard.agent} (${how}) from the manifest reproduces every metric`,
     };
   }
   return {
