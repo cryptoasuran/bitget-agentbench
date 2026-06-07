@@ -23,3 +23,14 @@ jobs:
         run: npm run build
       - name: Test
         run: npm test
+      - name: Verify committed reports reproduce
+        # Dogfood: every committed scorecard must pass verify. If a metric, a
+        # candle or a ledger ever stops reproducing, this step (and CI) go red.
+        run: |
+          set -e
+          shopt -s nullglob
+          for d in reports/*/; do
+            echo "::group::verify $d"
+            node dist/cli.js verify "$d"
+            echo "::endgroup::"
+          done

@@ -249,10 +249,19 @@ export const RunManifestSchema = z.object({
 });
 export type RunManifest = z.infer<typeof RunManifestSchema>;
 
-/** The full signed scorecard. This file IS the verifiable usage evidence. */
+/**
+ * The full scorecard. This file IS the verifiable usage evidence.
+ *
+ * `scorecardSha256` is a content hash over {agent, metrics, manifest}, written at
+ * emit time so the artifact is self-certifying. It is optional on the schema so
+ * scorecards produced before 0.2.0 still parse; `agentbench verify` treats its
+ * absence as a skipped integrity check, not a failure.
+ */
 export const ScorecardSchema = z.object({
   agent: z.string(),
   metrics: MetricsSchema,
   manifest: RunManifestSchema,
+  /** SHA256 over {agent, metrics, manifest}. See report/hash.ts. */
+  scorecardSha256: z.string().optional(),
 });
 export type Scorecard = z.infer<typeof ScorecardSchema>;

@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer } from "../src/mcp.js";
 import {
   CallToolRequestSchema,
@@ -21,7 +24,7 @@ describe("agentbench MCP server", () => {
     expect(server).toBeTruthy();
   });
 
-  it("exposes exactly the agentbench_run tool", async () => {
+  it("exposes the agentbench_run and agentbench_verify tools", async () => {
     const server = createServer();
     // Access the internal handler map through a request round-trip.
     const handler = (server as unknown as {
@@ -32,7 +35,10 @@ describe("agentbench MCP server", () => {
       method: "tools/list",
       params: {},
     })) as { tools: { name: string }[] };
-    expect(result.tools.map((t) => t.name)).toEqual(["agentbench_run"]);
+    expect(result.tools.map((t) => t.name)).toEqual([
+      "agentbench_run",
+      "agentbench_verify",
+    ]);
   });
 
   it("agentbench_run returns a scorecard for a valid request", async () => {
@@ -68,5 +74,37 @@ describe("agentbench MCP server", () => {
     })) as { isError?: boolean; content: { text: string }[] };
     expect(result.isError).toBe(true);
     expect(result.content[0]!.text).toContain("Unknown strategy");
+  });
+
+  it("agentbench_run persists a report when outDir is given, and verify confirms it", async () => {
+    const server = createServer();
+    const handler = (server as unknown as {
+      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>;
+    })._requestHandlers.get(CallToolRequestSchema.shape.method.value)!;
+    const outDir = mkdtempSync(join(tmpdir(), "agentbench-mcp-"));
+
+    const runResult = (await handler({
+      method: "tools/call",
+      params: {
+        name: "agentbench_run",
+        arguments: { strategy: "rsi-meanrev", symbol: "BTCUSDT", granularity: "4h", seed: 42, outDir },
+      },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(runResult.isError).toBeFalsy();
+    const runPayload = JSON.parse(runResult.content[0]!.text);
+    expect(runPayload.reportDir).toBe(outDir);
+    expect(runPayload.scorecardSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(existsSync(join(outDir, "scorecard.json"))).toBe(true);
+    expect(existsSync(join(outDir, "trades.jsonl"))).toBe(true);
+
+    // Agents grading agents: verify the persisted run through the MCP tool.
+    const verifyResult = (await handler({
+      method: "tools/call",
+      params: { name: "agentbench_verify", arguments: { target: outDir } },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(verifyResult.isError).toBeFalsy();
+    const verifyPayload = JSON.parse(verifyResult.content[0]!.text);
+    expect(verifyPayload.pass).toBe(true);
+    expect(verifyPayload.checks.find((c: { name: string }) => c.name === "replay").status).toBe("pass");
   });
 });

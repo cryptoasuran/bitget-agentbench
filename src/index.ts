@@ -51,11 +51,20 @@ export { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
 // Report
 export { emitReport, hashDataset } from "./report/emit.js";
 export { renderHtml } from "./report/html.js";
+export { computeScorecardSha256, canonicalJson } from "./report/hash.js";
+
+// Verification
+export { verifyReport } from "./verify.js";
+export type { VerifyResult, CheckResult, CheckName, CheckStatus, MetricDiff } from "./verify.js";
 
 // Built-in example strategies (reusable)
 export { default as smaCrossover } from "./strategies/sma-crossover.js";
 export { default as rsiMeanrev } from "./strategies/rsi-meanrev.js";
 export { STRATEGIES, listStrategies } from "./strategies/registry.js";
+
+// Adapters
+export { fromAgentHub, toOrder } from "./adapters/agent-hub.js";
+export type { AgentHubOrder, AgentHubDecide } from "./adapters/agent-hub.js";
 
 // Package version (single source of truth, stamped into every scorecard)
 export { VERSION } from "./version.js";

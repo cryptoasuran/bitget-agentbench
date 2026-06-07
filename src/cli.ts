@@ -7,6 +7,7 @@
  *                  [--seed 42] [--out ./report]
  *   agentbench report <scorecard.json>
  *   agentbench compare <a.json> <b.json>
+ *   agentbench verify <report-dir | scorecard.json>
  */
 
 import { readFileSync, realpathSync } from "node:fs";
@@ -15,6 +16,8 @@ import { fileURLToPath } from "node:url";
 import { loadFixture } from "./sources/fixture-source.js";
 import { runBacktest } from "./engine/backtest.js";
 import { emitReport, hashDataset } from "./report/emit.js";
+import { verifyReport } from "./verify.js";
+import type { CheckStatus } from "./verify.js";
 import { STRATEGIES, listStrategies } from "./strategies/registry.js";
 import { VERSION } from "./version.js";
 import { ScorecardSchema } from "./types.js";
@@ -64,6 +67,7 @@ function helpText(): string {
       "               --tf <1h|4h|1day|...> [--seed <n>] [--out <dir>]",
       "  agentbench report <scorecard.json>",
       "  agentbench compare <a.json> <b.json>",
+      "  agentbench verify <report-dir | scorecard.json>",
       "",
       `Built-in strategies: ${listStrategies().join(", ")}`,
       "",
@@ -72,6 +76,7 @@ function helpText(): string {
       "  agentbench run --agent ./my-agent.ts --symbol ETHUSDT --tf 4h --seed 99",
       "  agentbench report ./r/scorecard.json",
       "  agentbench compare ./a/scorecard.json ./b/scorecard.json",
+      "  agentbench verify ./r",
       "",
       `version ${VERSION}`,
     ].join("\n") + "\n"
@@ -92,6 +97,8 @@ async function main(argv: string[]): Promise<void> {
     await cmdReport(opts);
   } else if (opts.cmd === "compare") {
     await cmdCompare(opts);
+  } else if (opts.cmd === "verify") {
+    await cmdVerify(opts);
   } else {
     process.stderr.write(`agentbench: unknown command "${opts.cmd}"\n`);
     process.exitCode = 1;
@@ -301,6 +308,59 @@ async function cmdCompare(opts: CliArgs): Promise<void> {
   }
 }
 
+const CHECK_TAG: Record<CheckStatus, string> = {
+  pass: "PASS",
+  fail: "FAIL",
+  skip: "SKIP",
+};
+
+async function cmdVerify(opts: CliArgs): Promise<void> {
+  const target = opts.args[0];
+  if (!target) {
+    process.stderr.write(
+      "agentbench verify: a report directory or scorecard.json path is required\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  let result;
+  try {
+    result = await verifyReport(target);
+  } catch (err) {
+    process.stderr.write(`agentbench verify: ${String(err)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write(`\nVerifying ${result.target}\n`);
+  process.stdout.write(`Agent:    ${result.agent}\n\n`);
+  for (const c of result.checks) {
+    process.stdout.write(`  [${CHECK_TAG[c.status]}] ${c.name.padEnd(9)} ${c.detail}\n`);
+    for (const d of c.diffs ?? []) {
+      process.stdout.write(
+        `           · ${d.field}: claimed ${d.claimed}, recomputed ${d.recomputed}\n`,
+      );
+    }
+  }
+
+  const anyFail = result.checks.some((c) => c.status === "fail");
+  if (result.pass) {
+    process.stdout.write("\nVERIFIED — the numbers were independently recomputed and match\n");
+  } else if (anyFail) {
+    process.stdout.write("\nFAILED — see the checks above\n");
+  } else {
+    // No check failed, but no substantive recompute (ledger or replay) ran, so
+    // the claim could not actually be checked. Not a pass.
+    process.stdout.write(
+      "\nUNVERIFIABLE — nothing failed, but no ledger or replay check could run, " +
+        "so the numbers were never independently recomputed. Point verify at a full " +
+        "report directory of a built-in or fixture-backed run.\n",
+    );
+  }
+  if (!result.pass) process.exitCode = 1;
+}
+
 export {
   parseArgs,
   helpText,
@@ -309,6 +369,7 @@ export {
   cmdRun,
   cmdReport,
   cmdCompare,
+  cmdVerify,
   main,
 };
 

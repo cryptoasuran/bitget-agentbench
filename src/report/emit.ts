@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import type { Scorecard, Fill, Bar } from "../types.js";
 import { renderHtml } from "./html.js";
+import { computeScorecardSha256 } from "./hash.js";
 
 /**
  * Deterministic SHA256 of a bar dataset. Hashes the canonical OHLCV tuples so
@@ -27,7 +28,7 @@ export function hashDataset(bars: readonly Bar[]): string {
 /**
  * Emit the full report suite into `outDir`.
  * Produces:
- *   scorecard.json    — the signed Scorecard (metrics + manifest)
+ *   scorecard.json    — the Scorecard (metrics + manifest) plus its content hash
  *   trades.jsonl      — one JSON object per fill line
  *   manifest.json     — the standalone run manifest
  *   equity.csv        — equity curve (one col per row, header row)
@@ -40,10 +41,15 @@ export function emitReport(
 ): void {
   mkdirSync(outDir, { recursive: true });
 
-  // scorecard.json
+  // scorecard.json — stamp a content hash so the artifact is self-certifying.
+  // The hash covers {agent, metrics, manifest}; verify recomputes and checks it.
+  const stamped: Scorecard = {
+    ...scorecard,
+    scorecardSha256: computeScorecardSha256(scorecard),
+  };
   writeFileSync(
     resolve(outDir, "scorecard.json"),
-    JSON.stringify(scorecard, null, 2),
+    JSON.stringify(stamped, null, 2),
     "utf8",
   );
 
@@ -62,10 +68,10 @@ export function emitReport(
     "utf8",
   );
 
-  // scorecard.html — self-contained visual report
+  // scorecard.html — self-contained visual report (carries the content hash too)
   writeFileSync(
     resolve(outDir, "scorecard.html"),
-    renderHtml(scorecard, equity, fills),
+    renderHtml(stamped, equity, fills),
     "utf8",
   );
 }

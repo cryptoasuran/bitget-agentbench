@@ -1,10 +1,10 @@
 {
   "name": "bitget-agentbench",
-  "version": "0.1.2",
-  "description": "Backtest, score and risk-guard Bitget trading agents on real candle data. Emits a reproducible scorecard and trade ledger you can hand a judge.",
+  "version": "0.2.0",
+  "description": "Backtest, score and verify Bitget trading agents on real candle data. Emits a reproducible scorecard anyone can re-run and check with `agentbench verify`.",
   "type": "module",
   "license": "MIT",
-  "author": "cryptoasuran",
+  "author": "zkasuran",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -21,6 +21,7 @@
     "dist",
     "fixtures",
     "examples",
+    "action.yml",
     "assets/architecture.png",
     "assets/logo-wordmark.png",
     "assets/scorecard.png",
@@ -40,11 +41,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cryptoasuran/bitget-agentbench.git"
+    "url": "git+https://github.com/zkasuran/bitget-agentbench.git"
   },
-  "homepage": "https://github.com/cryptoasuran/bitget-agentbench#readme",
+  "homepage": "https://github.com/zkasuran/bitget-agentbench#readme",
   "bugs": {
-    "url": "https://github.com/cryptoasuran/bitget-agentbench/issues"
+    "url": "https://github.com/zkasuran/bitget-agentbench/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -57,7 +58,11 @@
     "ai",
     "crypto",
     "scorecard",
-    "risk"
+    "risk",
+    "verify",
+    "reproducible",
+    "mcp",
+    "agent-hub"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
