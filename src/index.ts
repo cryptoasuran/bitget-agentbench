@@ -47,6 +47,8 @@ export { SeededRng } from "./engine/rng.js";
 
 // Sources
 export { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
+export { fetchCandles, fetchRawCandles } from "./sources/candle-source.js";
+export type { FetchLike, FetchCandlesOptions, BitgetCandleResponse } from "./sources/candle-source.js";
 
 // Report
 export { emitReport, hashDataset } from "./report/emit.js";

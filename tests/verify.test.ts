@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync, cpSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runBacktest } from "../src/engine/backtest.js";
@@ -172,6 +172,56 @@ describe("verifyReport — a SKIP is never a free pass (the forger's escape)", (
   it("a clean built-in report stays VERIFIED (replay is substantive)", async () => {
     const r = await verifyReport(goodDir);
     expect(r.pass).toBe(true);
+  });
+});
+
+describe("verifyReport — a live (source=candles) run verifies from its snapshot", () => {
+  // Build a report whose candles came from "live": emit the standard report, mark
+  // the manifest source as candles, and drop a candles.json snapshot beside it.
+  async function makeLiveReport(): Promise<string> {
+    const dir = mkdtempSync(join(tmpdir(), "agentbench-verify-live-"));
+    const bars = loadFixture("BTCUSDT", "4h");
+    const { scorecard, fills, equityCurve } = await runBacktest({
+      agent: STRATEGIES["rsi-meanrev"]!,
+      bars,
+      config: { startingEquity: 10_000, feeBps: 10, slippageBps: 1, seed: 42 },
+      risk: { maxDrawdownKill: 0.3, maxPositionSize: 1 },
+      manifest: {
+        agentbenchVersion: VERSION,
+        symbol: "BTCUSDT",
+        granularity: "4h",
+        source: "candles", // pretend these came from the live endpoint
+        bars: bars.length,
+        firstBarTime: bars[0]!.time,
+        lastBarTime: bars[bars.length - 1]!.time,
+        datasetSha256: hashDataset(bars),
+      },
+    });
+    emitReport(scorecard, fills, equityCurve, dir);
+    // snapshot the exact candles in the Bitget raw shape, like the CLI does
+    const rawRows = bars.map((b) => [
+      String(b.time), String(b.open), String(b.high), String(b.low), String(b.close), String(b.volume), "0", "0",
+    ]);
+    writeFileSync(join(dir, "candles.json"), JSON.stringify({ code: "00000", msg: "success", requestTime: 0, data: rawRows }));
+    return dir;
+  }
+
+  it("passes all four checks when the candles.json snapshot is present", async () => {
+    const dir = await makeLiveReport();
+    const r = await verifyReport(dir);
+    expect(check(r, "dataset").status).toBe("pass");
+    expect(check(r, "ledger").status).toBe("pass");
+    expect(check(r, "replay").status).toBe("pass");
+    expect(r.pass).toBe(true);
+  });
+
+  it("skips dataset/ledger/replay (not throws) when the snapshot is missing", async () => {
+    const dir = await makeLiveReport();
+    rmSync(join(dir, "candles.json"));
+    const r = await verifyReport(dir);
+    expect(check(r, "dataset").status).toBe("skip");
+    expect(check(r, "replay").status).toBe("skip");
+    expect(r.pass).toBe(false); // no substantive recompute could run
   });
 });
 

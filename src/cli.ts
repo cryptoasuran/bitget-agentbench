@@ -10,10 +10,11 @@
  *   agentbench verify <report-dir | scorecard.json>
  */
 
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, realpathSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadFixture } from "./sources/fixture-source.js";
+import { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
+import { fetchRawCandles } from "./sources/candle-source.js";
 import { runBacktest } from "./engine/backtest.js";
 import { emitReport, hashDataset } from "./report/emit.js";
 import { verifyReport } from "./verify.js";
@@ -31,6 +32,10 @@ interface CliArgs {
   granularity?: Granularity;
   seed?: number;
   outDir?: string;
+  /** "fixture" (default, zero-network) or "live" (fetch fresh Bitget candles). */
+  source?: string;
+  /** Candle count for --source live (default 200, capped at 1000). */
+  limit?: number;
   args: string[];
 }
 
@@ -46,6 +51,8 @@ function parseArgs(argv: string[]): CliArgs {
       case "--tf": result.granularity = argv[++i] as Granularity; break;
       case "--seed": result.seed = Number(argv[++i]); break;
       case "--out": result.outDir = argv[++i]; break;
+      case "--source": result.source = argv[++i]; break;
+      case "--limit": result.limit = Number(argv[++i]); break;
       case "--help": case "-h": result.cmd = "help"; break;
       default:
         if (!result.cmd && !a.startsWith("--")) result.cmd = a;
@@ -65,14 +72,20 @@ function helpText(): string {
       "Usage:",
       "  agentbench run (--strategy <name> | --agent <file>) --symbol <SYM>",
       "               --tf <1h|4h|1day|...> [--seed <n>] [--out <dir>]",
+      "               [--source <fixture|live>] [--limit <n>]",
       "  agentbench report <scorecard.json>",
       "  agentbench compare <a.json> <b.json>",
       "  agentbench verify <report-dir | scorecard.json>",
       "",
       `Built-in strategies: ${listStrategies().join(", ")}`,
       "",
+      "Sources: fixture (default, committed candles, zero network) or live",
+      "  (fetch fresh candles from Bitget's public keyless endpoint; the run",
+      "  snapshots them to candles.json so it stays verifiable).",
+      "",
       "Examples:",
       "  agentbench run --strategy sma-crossover --symbol BTCUSDT --tf 4h --out ./r",
+      "  agentbench run --strategy rsi-meanrev --symbol BTCUSDT --tf 4h --source live --limit 500 --out ./r",
       "  agentbench run --agent ./my-agent.ts --symbol ETHUSDT --tf 4h --seed 99",
       "  agentbench report ./r/scorecard.json",
       "  agentbench compare ./a/scorecard.json ./b/scorecard.json",
@@ -191,8 +204,33 @@ async function cmdRun(opts: CliArgs): Promise<void> {
     return;
   }
 
-  process.stderr.write(`Loading fixture ${symbol} ${granularity}...\n`);
-  const bars = loadFixture(symbol, granularity);
+  // Load candles: a committed fixture (default, zero network) or fresh from
+  // Bitget's public keyless endpoint. A live run snapshots the exact candles it
+  // fetched so the result stays reproducible and verifiable afterward.
+  const sourceOpt = opts.source ?? "fixture";
+  const live = sourceOpt === "live" || sourceOpt === "candles";
+  let bars;
+  let manifestSource: "fixture" | "candles";
+  let rawSnapshot: Awaited<ReturnType<typeof fetchRawCandles>> | null = null;
+  if (live) {
+    const limit = opts.limit ?? 200;
+    process.stderr.write(
+      `Fetching live candles ${symbol} ${granularity} (limit ${limit}) from Bitget...\n`,
+    );
+    try {
+      rawSnapshot = await fetchRawCandles({ symbol, granularity, limit });
+    } catch (err) {
+      process.stderr.write(`agentbench run: live fetch failed: ${String(err)}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    bars = parseRawCandles(rawSnapshot.data as Parameters<typeof parseRawCandles>[0]);
+    manifestSource = "candles";
+  } else {
+    process.stderr.write(`Loading fixture ${symbol} ${granularity}...\n`);
+    bars = loadFixture(symbol, granularity);
+    manifestSource = "fixture";
+  }
   process.stderr.write(`Loaded ${bars.length} bars\n`);
 
   const config = { startingEquity: 10_000, feeBps: 10, slippageBps: 1, seed };
@@ -211,7 +249,7 @@ async function cmdRun(opts: CliArgs): Promise<void> {
       agentbenchVersion: VERSION,
       symbol,
       granularity,
-      source: "fixture",
+      source: manifestSource,
       bars: bars.length,
       firstBarTime: bars[0]?.time ?? 0,
       lastBarTime: bars[bars.length - 1]?.time ?? 0,
@@ -220,6 +258,11 @@ async function cmdRun(opts: CliArgs): Promise<void> {
   });
 
   emitReport(scorecard, fills, equityCurve, outDir);
+  // Snapshot the exact live candles next to the report so verify can re-derive
+  // the dataset hash, recompute the ledger and replay on the same data.
+  if (rawSnapshot) {
+    writeFileSync(resolve(outDir, "candles.json"), JSON.stringify(rawSnapshot), "utf8");
+  }
   process.stdout.write(formatScorecardSummary(scorecard, outDir));
 
   if (violations.length > 0) {
