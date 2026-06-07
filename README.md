@@ -223,6 +223,23 @@ It runs `agentbench verify` and the job goes red if integrity, dataset, ledger o
 replay fail. This repo dogfoods it: every report under `reports/` is verified on
 every push, so the badge above means the committed numbers still reproduce.
 
+## Live candles
+
+By default AgentBench runs on committed fixtures: zero network, fully
+reproducible. To score against fresh data, add `--source live`:
+
+```bash
+npx agentbench run --strategy rsi-meanrev --symbol BTCUSDT --tf 4h --source live --limit 500 --out ./report
+npx agentbench verify ./report
+```
+
+It pulls candles from Bitget's public spot endpoint (keyless, read-only) and
+snapshots the exact candles it used into `report/candles.json`. The run records
+`source: "candles"`. Verify then re-derives the dataset hash, recomputes the
+ledger and replays the strategy against that snapshot, so a live run stays
+checkable: the data changes between fetches, but the result you publish does not.
+Fixtures remain the default, because determinism is the point.
+
 ## RiskGuard
 
 Every order passes through a policy gate before it can fill. Set only the limits
@@ -260,6 +277,9 @@ This is a long-only spot engine. Short positions and futures funding are out of
 scope for this release, named on purpose rather than half-built. A sell larger
 than your position is clamped to what you hold, never silently turned into a short.
 
+Candles come from a committed fixture by default, or live from Bitget's public
+keyless endpoint with `--source live` (see Live candles above).
+
 ## Reproducibility
 
 The manifest records the dataset hash, symbol, timeframe, engine config and seed.
@@ -280,7 +300,7 @@ your global config or your credentials.
 ```bash
 npm install
 npm run build
-npm test          # 65 tests: simulator, metrics, fixtures, hash, verify, adapter, cli, mcp
+npm test          # 81 tests: simulator, metrics, fixtures, candle source, hash, verify, adapter, cli, mcp
 npm run typecheck
 npm run guard:deps
 ```
@@ -288,10 +308,10 @@ npm run guard:deps
 ## Verification done
 
 Every financial formula is reviewed and the whole suite is verified locally before
-release: 65 passing tests, a clean type-check, end-to-end runs that reproduce
+release: 81 passing tests, a clean type-check, end-to-end runs that reproduce
 byte-identical scorecards from a fixed seed, and `agentbench verify` passing on
-every committed report. The fill model, fee rate and metric formulas are
-documented above so they can be checked rather than trusted.
+every committed report and on a live-fetched run. The fill model, fee rate and
+metric formulas are documented above so they can be checked rather than trusted.
 
 ## License
 

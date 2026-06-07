@@ -25,11 +25,11 @@
 import { readFileSync, statSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { ScorecardSchema, FillSchema } from "./types.js";
-import type { Scorecard, Fill, Metrics, Violation } from "./types.js";
+import type { Scorecard, Fill, Metrics, Violation, Bar } from "./types.js";
 import { hashDataset } from "./report/emit.js";
 import { computeScorecardSha256 } from "./report/hash.js";
 import { computeMetrics } from "./engine/metrics.js";
-import { loadFixture } from "./sources/fixture-source.js";
+import { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
 import { runBacktest } from "./engine/backtest.js";
 import { STRATEGIES } from "./strategies/registry.js";
 
@@ -109,9 +109,9 @@ export async function verifyReport(target: string): Promise<VerifyResult> {
 
   const checks: CheckResult[] = [
     checkIntegrity(scorecardPath, scorecard),
-    checkDataset(scorecard),
+    checkDataset(dir, scorecard),
     checkLedger(dir, scorecard),
-    await checkReplay(scorecard),
+    await checkReplay(dir, scorecard),
   ];
 
   // A SKIP is never a free pass. Require a substantive recompute (ledger or
@@ -135,6 +135,31 @@ function skip(name: CheckName, detail: string): CheckResult {
 function readScorecard(path: string): Scorecard {
   const raw = JSON.parse(readFileSync(path, "utf8"));
   return ScorecardSchema.parse(raw);
+}
+
+/**
+ * Reload the exact candles a run used, so every check re-derives against the same
+ * data. A fixture run loads the committed fixture; a live (`source: "candles"`)
+ * run loads the `candles.json` snapshot the run wrote next to its report. Throws
+ * if the data is not available, which the callers turn into a skip.
+ */
+function loadBarsFor(scorecard: Scorecard, dir: string): Bar[] {
+  const m = scorecard.manifest;
+  if (m.source === "fixture") {
+    return loadFixture(m.symbol, m.granularity);
+  }
+  const snapshot = join(dir, "candles.json");
+  if (!existsSync(snapshot)) {
+    throw new Error(
+      `no candles.json snapshot in ${dir}; a live (source=candles) run keeps one so it can be verified`,
+    );
+  }
+  const payload = JSON.parse(readFileSync(snapshot, "utf8"));
+  const data = payload?.data ?? payload;
+  if (!Array.isArray(data)) {
+    throw new Error(`candles.json in ${dir}: expected an array at .data or root`);
+  }
+  return parseRawCandles(data);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,31 +194,25 @@ function checkIntegrity(path: string, scorecard: Scorecard): CheckResult {
 // dataset
 // ---------------------------------------------------------------------------
 
-function checkDataset(scorecard: Scorecard): CheckResult {
+function checkDataset(dir: string, scorecard: Scorecard): CheckResult {
   const m = scorecard.manifest;
-  if (m.source !== "fixture") {
-    return {
-      name: "dataset",
-      status: "skip",
-      detail: `dataset source is "${m.source}", not bundled; cannot re-derive the candle hash`,
-    };
-  }
   let bars;
   try {
-    bars = loadFixture(m.symbol, m.granularity);
+    bars = loadBarsFor(scorecard, dir);
   } catch (err) {
     return {
       name: "dataset",
       status: "skip",
-      detail: `fixture for ${m.symbol} ${m.granularity} not available here: ${String(err)}`,
+      detail: `cannot reload the dataset to re-derive its hash: ${String(err)}`,
     };
   }
   const recomputed = hashDataset(bars);
+  const kind = m.source === "candles" ? "live" : "fixture";
   if (recomputed === m.datasetSha256) {
     return {
       name: "dataset",
       status: "pass",
-      detail: `${bars.length} candles re-hash to the claimed dataset SHA256 (${recomputed.slice(0, 16)}…)`,
+      detail: `${bars.length} ${kind} candles re-hash to the claimed dataset SHA256 (${recomputed.slice(0, 16)}…)`,
     };
   }
   return {
@@ -222,7 +241,7 @@ function checkLedger(dir: string, scorecard: Scorecard): CheckResult {
   const m = scorecard.manifest;
   let bars;
   try {
-    bars = loadFixture(m.symbol, m.granularity);
+    bars = loadBarsFor(scorecard, dir);
   } catch (err) {
     return {
       name: "ledger",
@@ -339,7 +358,7 @@ function reconstructPositionHeld(
 // replay
 // ---------------------------------------------------------------------------
 
-async function checkReplay(scorecard: Scorecard): Promise<CheckResult> {
+async function checkReplay(dir: string, scorecard: Scorecard): Promise<CheckResult> {
   const agent = STRATEGIES[scorecard.agent];
   if (!agent) {
     return {
@@ -351,12 +370,12 @@ async function checkReplay(scorecard: Scorecard): Promise<CheckResult> {
   const m = scorecard.manifest;
   let bars;
   try {
-    bars = loadFixture(m.symbol, m.granularity);
+    bars = loadBarsFor(scorecard, dir);
   } catch (err) {
     return {
       name: "replay",
       status: "skip",
-      detail: `fixture for ${m.symbol} ${m.granularity} not available to replay: ${String(err)}`,
+      detail: `candles for ${m.symbol} ${m.granularity} not available to replay: ${String(err)}`,
     };
   }
 
