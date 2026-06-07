@@ -57,7 +57,10 @@ export { computeScorecardSha256, canonicalJson } from "./report/hash.js";
 
 // Verification
 export { verifyReport } from "./verify.js";
-export type { VerifyResult, CheckResult, CheckName, CheckStatus, MetricDiff } from "./verify.js";
+export type { VerifyResult, CheckResult, CheckName, CheckStatus, MetricDiff, VerifyOptions } from "./verify.js";
+
+// Agent loading (used by the CLI and by verify --agent)
+export { loadAgentFromFile } from "./agent-loader.js";
 
 // Built-in example strategies (reusable)
 export { default as smaCrossover } from "./strategies/sma-crossover.js";

@@ -16,7 +16,7 @@
     "violations": 0
   },
   "manifest": {
-    "agentbenchVersion": "0.3.1",
+    "agentbenchVersion": "0.4.0",
     "symbol": "SOLUSDT",
     "granularity": "4h",
     "source": "fixture",
@@ -36,5 +36,5 @@
       "maxPositionSize": 1
     }
   },
-  "scorecardSha256": "aef496f33a7835b67a39c5850599047599b84566ae63efeb395d9d0ccb45b7fe"
+  "scorecardSha256": "c3034f2fa9233b48b70f167edcf8779c4196fd0b5571e702ac4f4e40fb423cfc"
 }

@@ -1,6 +1,6 @@
 {
   "name": "bitget-agentbench",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Backtest, score and verify Bitget trading agents on real candle data. Emits a reproducible scorecard anyone can re-run and check with `agentbench verify`.",
   "type": "module",
   "license": "MIT",

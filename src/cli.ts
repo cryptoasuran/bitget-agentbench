@@ -11,7 +11,7 @@
  */
 
 import { readFileSync, writeFileSync, realpathSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadFixture, parseRawCandles } from "./sources/fixture-source.js";
 import { fetchRawCandles } from "./sources/candle-source.js";
@@ -27,6 +27,7 @@ import type { Granularity, Scorecard, StrategyAgent } from "./types.js";
 interface CliArgs {
   cmd: string;
   strategyName?: string;
+  /** Agent file: the strategy to run (run --agent) or to replay (verify --agent). */
   agentPath?: string;
   symbol?: string;
   granularity?: Granularity;
@@ -36,6 +37,8 @@ interface CliArgs {
   source?: string;
   /** Candle count for --source live (default 200, capped at 1000). */
   limit?: number;
+  /** verify: opt in to replaying an agent snapshot embedded in the report. */
+  replayEmbedded?: boolean;
   args: string[];
 }
 
@@ -53,6 +56,7 @@ function parseArgs(argv: string[]): CliArgs {
       case "--out": result.outDir = argv[++i]; break;
       case "--source": result.source = argv[++i]; break;
       case "--limit": result.limit = Number(argv[++i]); break;
+      case "--replay-embedded": result.replayEmbedded = true; break;
       case "--help": case "-h": result.cmd = "help"; break;
       default:
         if (!result.cmd && !a.startsWith("--")) result.cmd = a;
@@ -75,7 +79,7 @@ function helpText(): string {
       "               [--source <fixture|live>] [--limit <n>]",
       "  agentbench report <scorecard.json>",
       "  agentbench compare <a.json> <b.json>",
-      "  agentbench verify <report-dir | scorecard.json>",
+      "  agentbench verify <report-dir | scorecard.json> [--agent <file>] [--replay-embedded]",
       "",
       `Built-in strategies: ${listStrategies().join(", ")}`,
       "",
@@ -83,13 +87,19 @@ function helpText(): string {
       "  (fetch fresh candles from Bitget's public keyless endpoint; the run",
       "  snapshots them to candles.json so it stays verifiable).",
       "",
+      "verify replays built-in strategies automatically. To replay your own agent,",
+      "  pass --agent <file>, or --replay-embedded to re-run the agent snapshot a",
+      "  run --agent saved inside the report. verify never runs report code without",
+      "  one of those flags.",
+      "",
       "Examples:",
       "  agentbench run --strategy sma-crossover --symbol BTCUSDT --tf 4h --out ./r",
       "  agentbench run --strategy rsi-meanrev --symbol BTCUSDT --tf 4h --source live --limit 500 --out ./r",
-      "  agentbench run --agent ./my-agent.ts --symbol ETHUSDT --tf 4h --seed 99",
+      "  agentbench run --agent ./my-agent.ts --symbol ETHUSDT --tf 4h --seed 99 --out ./r",
       "  agentbench report ./r/scorecard.json",
       "  agentbench compare ./a/scorecard.json ./b/scorecard.json",
       "  agentbench verify ./r",
+      "  agentbench verify ./r --agent ./my-agent.ts",
       "",
       `version ${VERSION}`,
     ].join("\n") + "\n"
@@ -263,6 +273,21 @@ async function cmdRun(opts: CliArgs): Promise<void> {
   if (rawSnapshot) {
     writeFileSync(resolve(outDir, "candles.json"), JSON.stringify(rawSnapshot), "utf8");
   }
+  // Snapshot the agent file so `verify --replay-embedded` can re-run an external
+  // strategy from this report alone. Copied verbatim; verify never executes it
+  // without the explicit opt-in.
+  if (opts.agentPath) {
+    try {
+      const ext = extname(opts.agentPath) || ".ts";
+      writeFileSync(
+        resolve(outDir, `agent.snapshot${ext}`),
+        readFileSync(resolve(opts.agentPath), "utf8"),
+        "utf8",
+      );
+    } catch (err) {
+      process.stderr.write(`agentbench run: could not snapshot the agent file: ${String(err)}\n`);
+    }
+  }
   process.stdout.write(formatScorecardSummary(scorecard, outDir));
 
   if (violations.length > 0) {
@@ -369,7 +394,10 @@ async function cmdVerify(opts: CliArgs): Promise<void> {
 
   let result;
   try {
-    result = await verifyReport(target);
+    result = await verifyReport(target, {
+      agentPath: opts.agentPath,
+      replayEmbedded: opts.replayEmbedded,
+    });
   } catch (err) {
     process.stderr.write(`agentbench verify: ${String(err)}\n`);
     process.exitCode = 1;

@@ -96,9 +96,22 @@ VERIFIED. The numbers were recomputed from the ledger and they match
   `trades.jsonl`, reconstructing position and exposure from the fills themselves,
   and asserts it matches the claim. Catches numbers that do not follow from the
   trades.
-- **replay** re-runs a built-in agent from the manifest's own config and seed and
-  asserts the metrics reproduce. The strongest check. It skips, with a note, for
-  an external agent it cannot run.
+- **replay** re-runs the strategy from the manifest's own config and seed and
+  asserts the metrics reproduce. The strongest check. It runs built-in strategies
+  automatically. To replay your own strategy, point it at the agent file:
+
+```bash
+npx agentbench verify ./report --agent ./my-agent.ts
+```
+
+`run --agent` also snapshots your strategy into the report as `agent.snapshot.*`,
+so `verify ./report --replay-embedded` can re-run it from the report alone. Replay
+covers any strategy this way, not just the built-ins.
+
+Verify never executes code from a report on its own. It runs the built-ins
+(its own code). It runs an external agent only when you pass it with `--agent`,
+or the embedded snapshot only when you opt in with `--replay-embedded`. Without
+one of those, replay skips and the verdict rests on integrity, dataset and ledger.
 
 The content hash alone only proves a file was not edited. A forger could edit a
 number and re-stamp the hash. They cannot beat **ledger** and **replay**, which
@@ -300,7 +313,7 @@ your global config or your credentials.
 ```bash
 npm install
 npm run build
-npm test          # 81 tests: simulator, metrics, fixtures, candle source, hash, verify, adapter, cli, mcp
+npm test          # 86 tests: simulator, metrics, fixtures, candle source, hash, verify, replay, adapter, cli, mcp
 npm run typecheck
 npm run guard:deps
 ```
@@ -308,7 +321,7 @@ npm run guard:deps
 ## Verification done
 
 Every financial formula is reviewed and the whole suite is verified locally before
-release: 81 passing tests, a clean type-check, end-to-end runs that reproduce
+release: 86 passing tests, a clean type-check, end-to-end runs that reproduce
 byte-identical scorecards from a fixed seed and `agentbench verify` passing on
 every committed report and on a live-fetched run. The fill model, fee rate and
 metric formulas are documented above so they can be checked rather than trusted.
